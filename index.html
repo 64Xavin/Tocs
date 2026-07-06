@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="El Toc">
+<meta name="theme-color" content="#EA580C">
+<meta name="description" content="Gestió de grups i rondes: qui paga, qui participa i com repartir la despesa">
+<title>El Toc · Rondes</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --accent:#EA580C;--accent-dark:#C2410C;--accent-light:#FFF7ED;
+  --credit:#059669;--credit-light:#ECFDF5;
+  --debit:#DC2626;--debit-light:#FEF2F2;--debit-muted:#FECACA;
+  --border:rgba(0,0,0,0.08);
+  --radius:10px;--radius-lg:14px;
+  --color-text-primary:#111827;--color-text-secondary:#6B7280;
+  --color-bg:#F3F4F6;--color-surface:#FFFFFF;--color-surface2:#F9FAFB;
+  --color-border:rgba(0,0,0,0.1);--color-border2:rgba(0,0,0,0.18);
+  --safe-top:env(safe-area-inset-top);
+  --safe-bottom:env(safe-area-inset-bottom);
+  --safe-left:env(safe-area-inset-left);
+  --safe-right:env(safe-area-inset-right);
+  --nav-height:60px;--topbar-height:52px;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --accent-light:#3b1a08;
+    --border:rgba(255,255,255,0.09);
+    --color-text-primary:#F9FAFB;--color-text-secondary:#9CA3AF;
+    --color-bg:#111827;--color-surface:#1F2937;--color-surface2:#111827;
+    --color-border:rgba(255,255,255,0.1);--color-border2:rgba(255,255,255,0.2);
+    --credit-light:#064E3B;--debit-light:#7F1D1D;
+  }
+}
+
+html,body{height:100%;overflow:hidden}
+body{font-family:'DM Sans',sans-serif;font-size:14px;color:var(--color-text-primary);background:var(--color-bg);display:flex;flex-direction:column}
+
+/* TOP BAR */
+.topbar{
+  position:fixed;top:0;left:0;right:0;z-index:50;
+  height:calc(var(--topbar-height) + var(--safe-top));
+  padding-top:var(--safe-top);
+  background:var(--color-surface);
+  border-bottom:0.5px solid var(--color-border);
+  display:flex;align-items:center;padding-left:calc(16px + var(--safe-left));padding-right:calc(16px + var(--safe-right));gap:10px;
+}
+.topbar-title{font-size:17px;font-weight:600;flex:1}
+.topbar-btn{padding:6px 14px;border-radius:20px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;white-space:nowrap}
+.topbar-btn:active{opacity:.8}
+
+/* SCROLL AREA */
+.scroll-area{
+  position:fixed;
+  top:calc(var(--topbar-height) + var(--safe-top));
+  bottom:calc(var(--nav-height) + var(--safe-bottom));
+  left:var(--safe-left);right:var(--safe-right);
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:12px 14px 8px;
+}
+
+/* BOTTOM NAV */
+.bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;z-index:50;
+  padding-bottom:var(--safe-bottom);
+  background:var(--color-surface);
+  border-top:0.5px solid var(--color-border);
+  display:flex;height:calc(var(--nav-height) + var(--safe-bottom));align-items:flex-start;padding-top:6px;
+}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 4px;cursor:pointer;border:none;background:transparent;font-family:'DM Sans',sans-serif;transition:opacity .1s}
+.nav-item:active{opacity:.6}
+.nav-icon{font-size:20px;line-height:1}
+.nav-label{font-size:10px;font-weight:500;color:var(--color-text-secondary)}
+.nav-item.active .nav-label{color:var(--accent)}
+
+/* PAGES */
+.page{display:none}.page.active{display:block}
+
+/* CARDS */
+.card{background:var(--color-surface);border:0.5px solid var(--color-border);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:10px}
+.card-inner{background:var(--color-surface2);border-radius:var(--radius);padding:12px 14px;margin-bottom:8px}
+.metric-label{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:3px}
+.metric-value{font-size:20px;font-weight:600;font-family:'DM Mono',monospace;line-height:1.1}
+
+/* GRID */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+
+/* SECTION HEADER */
+.sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.sh-title{font-size:15px;font-weight:600}
+.section-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-secondary);margin:16px 0 8px}
+
+/* GROUP CARD */
+.group-card{background:var(--color-surface);border:0.5px solid var(--color-border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:10px;cursor:pointer;-webkit-user-select:none;user-select:none}
+.group-card:active{opacity:.92}
+.group-header{padding:14px 16px;display:flex;align-items:center;gap:12px}
+.group-avatar{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0}
+.group-stats{display:flex;border-top:0.5px solid var(--color-border)}
+.group-stat{flex:1;padding:10px;text-align:center}
+.group-stat:not(:last-child){border-right:0.5px solid var(--color-border)}
+
+/* BADGE */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;letter-spacing:.02em}
+.b-fixed{background:var(--accent-light);color:var(--accent)}
+.b-event{background:var(--color-surface2);color:var(--color-text-secondary);border:0.5px solid var(--color-border2)}
+.b-admin{background:var(--credit-light);color:var(--credit)}
+
+/* MEMBER ROW */
+.member-row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:0.5px solid var(--color-border)}
+.member-row:last-child{border-bottom:none}
+.avatar-sm{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:12px;flex-shrink:0;background:var(--accent-light);color:var(--accent)}
+
+/* ROUND ROW */
+.round-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:0.5px solid var(--color-border);cursor:pointer}
+.round-row:last-child{border-bottom:none}
+
+/* TURN BANNER */
+.turn-banner{background:linear-gradient(135deg,var(--accent),var(--accent-dark));color:#fff;border-radius:var(--radius-lg);padding:16px;margin-bottom:12px;display:flex;align-items:center;gap:14px}
+.turn-avatar{width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0}
+
+/* EMPTY */
+.empty{text-align:center;padding:40px 16px;color:var(--color-text-secondary)}
+.empty-icon{font-size:42px;margin-bottom:10px}
+
+/* FORM */
+.form-group{margin-bottom:12px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+label{display:block;font-size:12px;font-weight:500;color:var(--color-text-secondary);margin-bottom:5px}
+input,select,textarea{
+  width:100%;padding:11px 12px;
+  border:0.5px solid var(--color-border2);
+  border-radius:var(--radius);
+  font-size:16px;font-family:'DM Sans',sans-serif;
+  background:var(--color-surface);color:var(--color-text-primary);
+  -webkit-appearance:none;appearance:none;
+}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(234,88,12,.15)}
+.hint{font-size:11px;color:var(--color-text-secondary);margin-top:4px}
+
+/* SEGMENTED */
+.seg{display:flex;background:var(--color-surface2);border-radius:var(--radius);padding:3px;gap:3px}
+.seg-btn{flex:1;padding:9px;border:none;background:transparent;border-radius:8px;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;color:var(--color-text-secondary);cursor:pointer}
+.seg-btn.active{background:var(--color-surface);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+
+/* PARTICIPANT PICKER */
+.pp-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border:0.5px solid var(--color-border2);border-radius:var(--radius);margin-bottom:7px;cursor:pointer}
+.pp-item.on{border-color:var(--accent);background:var(--accent-light)}
+.pp-check{width:22px;height:22px;border-radius:6px;border:1.5px solid var(--color-border2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;color:#fff}
+.pp-item.on .pp-check{background:var(--accent);border-color:var(--accent)}
+.pp-name{flex:1;font-size:14px;font-weight:500}
+.pp-amt{width:92px}
+
+/* MODAL SHEET */
+.sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:flex-end}
+.sheet{
+  background:var(--color-surface);
+  border-radius:20px 20px 0 0;
+  width:100%;max-height:94vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding-bottom:var(--safe-bottom);
+}
+.sheet-handle{width:36px;height:4px;background:var(--color-border2);border-radius:2px;margin:10px auto 0}
+.sheet-header{padding:14px 18px;border-bottom:0.5px solid var(--color-border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--color-surface);z-index:2}
+.sheet-title{font-size:16px;font-weight:600}
+.sheet-body{padding:16px 18px}
+.sheet-footer{padding:12px 18px;border-top:0.5px solid var(--color-border);display:flex;gap:8px;position:sticky;bottom:0;background:var(--color-surface)}
+.icon-close{background:none;border:none;color:var(--color-text-secondary);font-size:20px;cursor:pointer;padding:0 4px}
+.hidden{display:none}
+
+/* BUTTONS */
+.btn{padding:12px 20px;border-radius:var(--radius);border:0.5px solid var(--color-border);cursor:pointer;font-size:15px;font-weight:600;font-family:'DM Sans',sans-serif;transition:opacity .1s;-webkit-user-select:none;user-select:none}
+.btn:active{opacity:.8}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent);flex:1}
+.btn-ghost{background:transparent;color:var(--color-text-secondary);flex:1}
+.btn-danger{background:transparent;color:var(--debit);border-color:var(--debit-muted);flex:1}
+.btn-block{width:100%;display:block}
+
+/* ONBOARDING */
+#onboarding{position:fixed;inset:0;z-index:500;background:var(--color-bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;text-align:center}
+#onboarding.hidden{display:none}
+.ob-logo{font-size:56px;margin-bottom:8px}
+.ob-title{font-size:24px;font-weight:700;margin-bottom:6px}
+.ob-sub{font-size:14px;color:var(--color-text-secondary);margin-bottom:26px;max-width:320px;line-height:1.5}
+.ob-form{width:100%;max-width:340px;text-align:left}
+
+/* INSTALL BANNER */
+#install-banner{display:none;margin-bottom:10px;border-radius:var(--radius-lg);padding:12px 16px;background:var(--accent);color:#fff;align-items:center;gap:10px}
+#install-banner.show{display:flex}
+.install-text{flex:1;font-size:13px;font-weight:500}
+.install-btn{padding:6px 14px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);border-radius:20px;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap}
+
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B7280' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:36px}
+.mono{font-family:'DM Mono',monospace}
+</style>
+</head>
+<body>
+
+<!-- ONBOARDING -->
+<div id="onboarding" class="hidden">
+  <div class="ob-logo">🍻</div>
+  <div class="ob-title">El Toc</div>
+  <div class="ob-sub">Gestiona les rondes del teu grup: qui paga, qui participa i com repartir la despesa.</div>
+  <div class="ob-form">
+    <div class="form-group">
+      <label>El teu nom *</label>
+      <input type="text" id="ob-name" placeholder="P.ex. Xavi" autocomplete="name">
+    </div>
+    <div class="form-group">
+      <label>Telèfon (9 dígits) *</label>
+      <input type="tel" id="ob-phone" placeholder="600123456" inputmode="numeric" maxlength="9" autocomplete="tel">
+      <div class="hint">T'identifica als grups. Només números, 9 dígits sense espais.</div>
+    </div>
+    <button class="btn btn-primary btn-block" style="margin-top:6px" onclick="saveOnboarding()">Entrar</button>
+  </div>
+</div>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <span class="topbar-title" id="topbar-title">Els meus grups</span>
+  <button class="topbar-btn hidden" id="topbar-action" onclick="handleTopbarAction()">+ Grup</button>
+</div>
+
+<!-- SCROLL AREA -->
+<div class="scroll-area" id="scroll-area">
+
+  <!-- INSTALL BANNER -->
+  <div id="install-banner">
+    <span class="install-text">Instal·la l'app al teu mòbil</span>
+    <button class="install-btn" id="install-btn" onclick="installApp()">Instal·lar</button>
+    <button style="background:none;border:none;color:rgba(255,255,255,.7);font-size:18px;cursor:pointer;padding:0 4px" onclick="hideBanner()">✕</button>
+  </div>
+
+  <!-- GRUPS -->
+  <div id="page-grups" class="page active">
+    <div id="grups-list"></div>
+  </div>
+
+  <!-- ACTIVITAT -->
+  <div id="page-activitat" class="page">
+    <div id="activitat-list"></div>
+  </div>
+
+  <!-- PERFIL -->
+  <div id="page-perfil" class="page">
+    <div class="card">
+      <div class="sh-title" style="margin-bottom:14px">El meu perfil</div>
+      <div class="member-row" style="border:none;padding-top:0">
+        <div class="avatar-sm" id="perfil-avatar" style="width:48px;height:48px;font-size:16px"></div>
+        <div style="flex:1">
+          <div style="font-size:16px;font-weight:600" id="perfil-name"></div>
+          <div class="mono" style="font-size:13px;color:var(--color-text-secondary)" id="perfil-phone"></div>
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="openSheet('perfil')">Editar perfil</button>
+    </div>
+    <div class="card">
+      <div class="sh-title" style="margin-bottom:8px">Sobre El Toc</div>
+      <p style="font-size:13px;color:var(--color-text-secondary);line-height:1.6">Les dades es desen només en aquest dispositiu. Comparteix el teu telèfon amb qui creï un grup perquè t'hi afegeixi. La sincronització entre mòbils diferents arribarà en una propera versió amb servidor.</p>
+      <button class="btn btn-danger btn-block" style="margin-top:12px" onclick="resetAll()">Esborrar totes les dades</button>
+    </div>
+  </div>
+
+</div><!-- /scroll-area -->
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="nav-item active" onclick="showPage('grups')" id="nav-grups">
+    <span class="nav-icon">👥</span><span class="nav-label">Grups</span>
+  </button>
+  <button class="nav-item" onclick="showPage('activitat')" id="nav-activitat">
+    <span class="nav-icon">🧾</span><span class="nav-label">Activitat</span>
+  </button>
+  <button class="nav-item" onclick="showPage('perfil')" id="nav-perfil">
+    <span class="nav-icon">👤</span><span class="nav-label">Perfil</span>
+  </button>
+</nav>
+
+<!-- SHEET: PERFIL -->
+<div id="sheet-perfil" class="sheet-overlay hidden" onclick="closeSheetIfOverlay(event,'sheet-perfil')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header"><span class="sheet-title">Editar perfil</span><button class="icon-close" onclick="closeSheet('sheet-perfil')">✕</button></div>
+    <div class="sheet-body">
+      <div class="form-group"><label>Nom *</label><input type="text" id="pf-name"></div>
+      <div class="form-group"><label>Telèfon (9 dígits) *</label><input type="tel" id="pf-phone" inputmode="numeric" maxlength="9"><div class="hint">Si canvies el telèfon perdràs l'accés als grups on constes amb l'antic.</div></div>
+    </div>
+    <div class="sheet-footer">
+      <button class="btn btn-ghost" onclick="closeSheet('sheet-perfil')">Cancel·lar</button>
+      <button class="btn btn-primary" onclick="savePerfil()">Desar</button>
+    </div>
+  </div>
+</div>
+
+<!-- SHEET: GRUP (crear/editar) -->
+<div id="sheet-grup" class="sheet-overlay hidden" onclick="closeSheetIfOverlay(event,'sheet-grup')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header"><span class="sheet-title" id="sheet-grup-title">Nou grup</span><button class="icon-close" onclick="closeSheet('sheet-grup')">✕</button></div>
+    <div class="sheet-body">
+      <input type="hidden" id="edit-grup-id">
+      <div class="form-group"><label>Nom del grup *</label><input type="text" id="grup-nom" placeholder="P.ex. Colla del bar"></div>
+      <div class="form-group"><label>Color</label>
+        <select id="grup-color"><option value="orange">Taronja</option><option value="blue">Blau</option><option value="green">Verd</option><option value="purple">Lila</option><option value="pink">Rosa</option><option value="teal">Turquesa</option></select>
+      </div>
+      <div class="hint" id="grup-admin-hint">Seràs l'administrador del grup: només tu podràs afegir o treure participants.</div>
+    </div>
+    <div class="sheet-footer">
+      <button class="btn btn-ghost" onclick="closeSheet('sheet-grup')">Cancel·lar</button>
+      <button class="btn btn-primary" onclick="saveGrup()">Desar</button>
+    </div>
+  </div>
+</div>
+
+<!-- SHEET: DETALL GRUP -->
+<div id="sheet-detall" class="sheet-overlay hidden" onclick="closeSheetIfOverlay(event,'sheet-detall')">
+  <div class="sheet" style="max-height:92vh">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header"><span class="sheet-title" id="detall-title"></span><button class="icon-close" onclick="closeSheet('sheet-detall')">✕</button></div>
+    <div class="sheet-body" id="detall-body"></div>
+  </div>
+</div>
+
+<!-- SHEET: MEMBRE -->
+<div id="sheet-membre" class="sheet-overlay hidden" onclick="closeSheetIfOverlay(event,'sheet-membre')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header"><span class="sheet-title">Afegir participant</span><button class="icon-close" onclick="closeSheet('sheet-membre')">✕</button></div>
+    <div class="sheet-body">
+      <div class="form-group"><label>Nom *</label><input type="text" id="mb-name" placeholder="Nom del participant"></div>
+      <div class="form-group"><label>Telèfon (9 dígits) *</label><input type="tel" id="mb-phone" inputmode="numeric" maxlength="9" placeholder="600123456"></div>
+      <div class="form-group">
+        <label>Tipus de participant</label>
+        <div class="seg">
+          <button type="button" class="seg-btn active" id="mb-fixed-y" onclick="setMbFixed(true)">Fix</button>
+          <button type="button" class="seg-btn" id="mb-fixed-n" onclick="setMbFixed(false)">Eventual</button>
+        </div>
+        <div class="hint">Els fixos surten preseleccionats a cada ronda; els eventuals no.</div>
+      </div>
+    </div>
+    <div class="sheet-footer">
+      <button class="btn btn-ghost" onclick="closeSheet('sheet-membre')">Cancel·lar</button>
+      <button class="btn btn-primary" onclick="saveMembre()">Afegir</button>
+    </div>
+  </div>
+</div>
+
+<!-- SHEET: RONDA -->
+<div id="sheet-ronda" class="sheet-overlay hidden" onclick="closeSheetIfOverlay(event,'sheet-ronda')">
+  <div class="sheet" style="max-height:94vh">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header"><span class="sheet-title" id="ronda-title">Nova ronda</span><button class="icon-close" onclick="closeSheet('sheet-ronda')">✕</button></div>
+    <div class="sheet-body">
+      <input type="hidden" id="edit-ronda-id">
+      <div class="form-row">
+        <div><label>Data *</label><input type="date" id="rn-data"></div>
+        <div><label>Import total (€) *</label><input type="number" id="rn-import" placeholder="0.00" step="0.01" min="0" inputmode="decimal" oninput="updateShares()"></div>
+      </div>
+      <div class="form-group"><label>Descripció</label><input type="text" id="rn-desc" placeholder="P.ex. Cervesa i tapes"></div>
+      <div class="form-group"><label>Qui paga *</label><select id="rn-payer"></select></div>
+      <div class="form-group">
+        <label>Repartiment</label>
+        <div class="seg">
+          <button type="button" class="seg-btn active" id="rn-split-eq" onclick="setSplit('equal')">A parts iguals</button>
+          <button type="button" class="seg-btn" id="rn-split-cu" onclick="setSplit('custom')">Imports diferents</button>
+        </div>
+      </div>
+      <div class="section-label" style="margin-top:6px">Qui participa</div>
+      <div id="rn-participants"></div>
+      <div id="rn-sumline" class="hint" style="margin-top:8px"></div>
+    </div>
+    <div class="sheet-footer">
+      <button id="rn-del" class="btn btn-danger hidden" onclick="deleteRonda()">Eliminar</button>
+      <button class="btn btn-ghost" onclick="closeSheet('sheet-ronda')">Cancel·lar</button>
+      <button class="btn btn-primary" onclick="saveRonda()">Desar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════ DADES ═══════════
+const COLORS={
+  orange:{bg:'#FFF7ED',text:'#C2410C',fill:'#F97316'},
+  blue:{bg:'#EFF6FF',text:'#1D4ED8',fill:'#3B82F6'},
+  green:{bg:'#ECFDF5',text:'#065F46',fill:'#10B981'},
+  purple:{bg:'#F5F3FF',text:'#5B21B6',fill:'#8B5CF6'},
+  pink:{bg:'#FDF2F8',text:'#9D174D',fill:'#EC4899'},
+  teal:{bg:'#F0FDFA',text:'#134E4A',fill:'#14B8A6'}
+};
+
+let me=null;          // {name, phone}
+let groups=[];        // [{id,name,color,adminPhone,members:[{phone,name,fixed}],createdAt}]
+let rounds=[];        // [{id,groupId,date,desc,payer,amount,participants:[phone],split,custom:{phone:amt}}]
+let currentPage='grups', currentGroupId=null, deferredInstall=null;
+let mbFixed=true, rnSplit='equal';
+
+function lsGet(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch{return null;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
+function load(){me=lsGet('toc_me');groups=lsGet('toc_groups')||[];rounds=lsGet('toc_rounds')||[];}
+function save(){lsSet('toc_me',me);lsSet('toc_groups',groups);lsSet('toc_rounds',rounds);}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+function fmt(n){return Number(n||0).toLocaleString('ca-ES',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function today(){return new Date().toISOString().slice(0,10);}
+function validPhone(p){return /^\d{9}$/.test(p);}
+function initials(name){return (name||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase()||'?';}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+// ═══════════ SELECTORS / LÒGICA ═══════════
+function groupById(id){return groups.find(g=>g.id===id);}
+function myGroups(){return groups.filter(g=>g.members.some(m=>m.phone===me.phone));}
+function isAdmin(g){return g&&g.adminPhone===me.phone;}
+function memberByPhone(g,phone){return g.members.find(m=>m.phone===phone);}
+function nameOf(g,phone){const m=memberByPhone(g,phone);return m?m.name:phone;}
+function roundsOf(gid){return rounds.filter(r=>r.groupId===gid).sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));}
+
+// Quota que assumeix cada participant en una ronda
+function shareFor(r,phone){
+  if(!r.participants.includes(phone))return 0;
+  if(r.split==='custom')return Number(r.custom?.[phone]||0);
+  return r.amount/r.participants.length;
+}
+
+// Balanç net per membre del grup: pagat - consumit. Positiu = li deuen; negatiu = deu.
+function computeBalances(g){
+  const bal={};
+  g.members.forEach(m=>bal[m.phone]=0);
+  roundsOf(g.id).forEach(r=>{
+    if(bal[r.payer]!==undefined)bal[r.payer]+=Number(r.amount);
+    g.members.forEach(m=>{bal[m.phone]-=shareFor(r,m.phone);});
+  });
+  return bal;
+}
+function paidStats(g){
+  const st={};g.members.forEach(m=>st[m.phone]={count:0,total:0});
+  roundsOf(g.id).forEach(r=>{if(st[r.payer]){st[r.payer].count++;st[r.payer].total+=Number(r.amount);}});
+  return st;
+}
+// Torn suggerit: el que més deu (balanç més negatiu). Empat -> qui ha pagat menys rondes.
+function suggestTurn(g){
+  if(!g.members.length)return null;
+  const bal=computeBalances(g),st=paidStats(g);
+  return [...g.members].sort((a,b)=>{
+    const d=bal[a.phone]-bal[b.phone];
+    if(Math.abs(d)>0.01)return d;
+    return st[a.phone].count-st[b.phone].count;
+  })[0].phone;
+}
+// Liquidació mínima (greedy)
+function settlements(bal){
+  const cred=[],deb=[];
+  Object.entries(bal).forEach(([p,v])=>{if(v>0.01)cred.push({p,v});else if(v<-0.01)deb.push({p,v:-v});});
+  cred.sort((a,b)=>b.v-a.v);deb.sort((a,b)=>b.v-a.v);
+  const res=[];let i=0,j=0;
+  while(i<deb.length&&j<cred.length){
+    const amt=Math.min(deb[i].v,cred[j].v);
+    res.push({from:deb[i].p,to:cred[j].p,amount:amt});
+    deb[i].v-=amt;cred[j].v-=amt;
+    if(deb[i].v<0.01)i++;if(cred[j].v<0.01)j++;
+  }
+  return res;
+}
+
+// ═══════════ NAVEGACIÓ ═══════════
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.getElementById('nav-'+id).classList.add('active');
+  currentPage=id;
+  const titles={grups:'Els meus grups',activitat:'Activitat recent',perfil:'Perfil'};
+  document.getElementById('topbar-title').textContent=titles[id]||id;
+  const btn=document.getElementById('topbar-action');
+  btn.classList.toggle('hidden',id!=='grups');
+  btn.textContent='+ Grup';
+  document.getElementById('scroll-area').scrollTop=0;
+  render();
+}
+function handleTopbarAction(){if(currentPage==='grups')openSheet('grup');}
+
+// ═══════════ RENDER ═══════════
+function render(){
+  if(currentPage==='grups')renderGrups();
+  if(currentPage==='activitat')renderActivitat();
+  if(currentPage==='perfil')renderPerfil();
+}
+
+function renderGrups(){
+  const el=document.getElementById('grups-list');
+  const gs=myGroups();
+  if(!gs.length){
+    el.innerHTML=`<div class="empty"><div class="empty-icon">🍻</div><p style="margin-bottom:14px">Encara no tens cap grup.<br>Crea'n un o demana que t'afegeixin.</p><button class="btn btn-primary" style="max-width:220px;margin:0 auto;display:block" onclick="openSheet('grup')">+ Crear grup</button></div>`;
+    return;
+  }
+  el.innerHTML=gs.map(g=>{
+    const col=COLORS[g.color]||COLORS.orange;
+    const bal=computeBalances(g);
+    const myBal=bal[me.phone]||0;
+    const turn=suggestTurn(g);
+    const rc=roundsOf(g.id).length;
+    return `<div class="group-card" onclick="openDetall('${g.id}')">
+      <div class="group-header">
+        <div class="group-avatar" style="background:${col.bg};color:${col.text}">${esc(initials(g.name))}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:15px;display:flex;align-items:center;gap:6px">${esc(g.name)}${isAdmin(g)?'<span class="badge b-admin">Admin</span>':''}</div>
+          <div style="font-size:12px;color:var(--color-text-secondary);margin-top:2px">${g.members.length} participants · ${rc} rondes</div>
+        </div>
+      </div>
+      <div class="group-stats">
+        <div class="group-stat"><div class="metric-label">El teu balanç</div><div class="mono" style="font-size:14px;font-weight:600;color:${myBal>=0?'var(--credit)':'var(--debit)'}">${myBal>=0?'+':''}€${fmt(myBal)}</div></div>
+        <div class="group-stat"><div class="metric-label">Torn suggerit</div><div style="font-size:14px;font-weight:600">${turn?esc(nameOf(g,turn)):'—'}</div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderActivitat(){
+  const el=document.getElementById('activitat-list');
+  const gids=myGroups().map(g=>g.id);
+  const rs=rounds.filter(r=>gids.includes(r.groupId)).sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id)).slice(0,40);
+  if(!rs.length){el.innerHTML='<div class="empty"><div class="empty-icon">🧾</div><p>Encara no hi ha rondes anotades.</p></div>';return;}
+  el.innerHTML='<div class="card" style="padding:2px 16px">'+rs.map(r=>{
+    const g=groupById(r.groupId);const col=COLORS[g.color]||COLORS.orange;
+    return `<div class="round-row" onclick="openDetall('${g.id}')">
+      <div class="avatar-sm" style="background:${col.bg};color:${col.text}">${esc(initials(nameOf(g,r.payer)))}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:500">${esc(nameOf(g,r.payer))} paga ${esc(r.desc||'una ronda')}</div>
+        <div style="font-size:11px;color:var(--color-text-secondary)"><span style="background:${col.bg};color:${col.text};padding:1px 6px;border-radius:10px;font-weight:600">${esc(g.name)}</span> · ${new Date(r.date).toLocaleDateString('ca-ES',{day:'numeric',month:'short'})} · ${r.participants.length} pers.</div>
+      </div>
+      <div class="mono" style="font-weight:600;font-size:14px;flex-shrink:0">€${fmt(r.amount)}</div>
+    </div>`;
+  }).join('')+'</div>';
+}
+
+function renderPerfil(){
+  document.getElementById('perfil-avatar').textContent=initials(me.name);
+  document.getElementById('perfil-name').textContent=me.name;
+  document.getElementById('perfil-phone').textContent=me.phone;
+}
+
+// ═══════════ DETALL GRUP ═══════════
+function openDetall(gid){
+  currentGroupId=gid;
+  renderDetall();
+  document.getElementById('sheet-detall').classList.remove('hidden');
+}
+function renderDetall(){
+  const g=groupById(currentGroupId);if(!g)return;
+  const admin=isAdmin(g);
+  const col=COLORS[g.color]||COLORS.orange;
+  const bal=computeBalances(g);
+  const st=paidStats(g);
+  const turn=suggestTurn(g);
+  const rs=roundsOf(g.id);
+  const setl=settlements(bal);
+  document.getElementById('detall-title').innerHTML=esc(g.name)+(admin?' <span class="badge b-admin">Admin</span>':'');
+
+  // membres ordenats: fixos primer
+  const members=[...g.members].sort((a,b)=>(b.fixed?1:0)-(a.fixed?1:0)||a.name.localeCompare(b.name));
+
+  let html='';
+  // torn
+  if(turn){
+    html+=`<div class="turn-banner">
+      <div class="turn-avatar">${esc(initials(nameOf(g,turn)))}</div>
+      <div><div style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;opacity:.85">Torn suggerit</div><div style="font-size:18px;font-weight:700">${esc(nameOf(g,turn))}</div><div style="font-size:12px;opacity:.9">és qui més deu — li tocaria pagar</div></div>
+    </div>`;
+  }
+  // accions
+  html+=`<button class="btn btn-primary btn-block" onclick="openRonda()">+ Anotar ronda</button>`;
+
+  // balanços
+  html+=`<div class="section-label">Balanços</div><div class="card" style="padding:6px 16px">`;
+  html+=members.map(m=>{
+    const v=bal[m.phone]||0;
+    return `<div class="member-row">
+      <div class="avatar-sm" style="background:${col.bg};color:${col.text}">${esc(initials(m.name))}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:500">${esc(m.name)}${m.phone===me.phone?' <span style="color:var(--color-text-secondary);font-weight:400">(tu)</span>':''}</div>
+        <div style="font-size:11px;color:var(--color-text-secondary)">${st[m.phone].count} rondes pagades · €${fmt(st[m.phone].total)}</div>
+      </div>
+      <div class="mono" style="font-weight:600;font-size:14px;color:${v>=0?'var(--credit)':'var(--debit)'}">${v>=0?'+':''}€${fmt(v)}</div>
+    </div>`;
+  }).join('')+`</div>`;
+  html+=`<div class="hint" style="margin-top:-4px">Positiu = li deuen · Negatiu = deu al grup</div>`;
+
+  // liquidació
+  if(setl.length){
+    html+=`<div class="section-label">Com saldar els comptes</div><div class="card" style="padding:6px 16px">`;
+    html+=setl.map(s=>`<div class="member-row" style="justify-content:space-between">
+      <div style="font-size:13px"><strong>${esc(nameOf(g,s.from))}</strong> → <strong>${esc(nameOf(g,s.to))}</strong></div>
+      <div class="mono" style="font-weight:600;color:var(--accent)">€${fmt(s.amount)}</div>
+    </div>`).join('')+`</div>`;
+  }
+
+  // membres (gestió)
+  html+=`<div class="section-label" style="display:flex;justify-content:space-between;align-items:center">Participants ${admin?`<button class="topbar-btn" style="font-size:11px;padding:4px 10px" onclick="openSheet('membre')">+ Afegir</button>`:''}</div><div class="card" style="padding:6px 16px">`;
+  html+=members.map(m=>`<div class="member-row">
+    <div class="avatar-sm" style="background:${col.bg};color:${col.text}">${esc(initials(m.name))}</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:14px;font-weight:500">${esc(m.name)}</div>
+      <div class="mono" style="font-size:11px;color:var(--color-text-secondary)">${esc(m.phone)}</div>
+    </div>
+    <span class="badge ${m.fixed?'b-fixed':'b-event'}">${m.fixed?'Fix':'Eventual'}</span>
+    ${admin&&m.phone!==g.adminPhone?`<button class="icon-close" style="font-size:16px;color:var(--debit)" onclick="removeMembre('${esc(m.phone)}')">✕</button>`:''}
+  </div>`).join('')+`</div>`;
+  if(!admin)html+=`<div class="hint" style="margin-top:-4px">Només l'administrador pot afegir o treure participants.</div>`;
+
+  // rondes
+  html+=`<div class="section-label">Rondes (${rs.length})</div>`;
+  if(!rs.length){html+=`<div class="card"><div class="empty" style="padding:20px"><p>Cap ronda encara. Anota la primera!</p></div></div>`;}
+  else{
+    html+=`<div class="card" style="padding:2px 16px">`+rs.map(r=>{
+      const canEdit=admin||r.payer===me.phone;
+      return `<div class="round-row" ${canEdit?`onclick="openRonda('${r.id}')"`:''}>
+        <div class="avatar-sm" style="background:${col.bg};color:${col.text}">${esc(initials(nameOf(g,r.payer)))}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:500">${esc(nameOf(g,r.payer))} · ${esc(r.desc||'ronda')}</div>
+          <div style="font-size:11px;color:var(--color-text-secondary)">${new Date(r.date).toLocaleDateString('ca-ES',{day:'numeric',month:'short',year:'numeric'})} · ${r.participants.length} pers. · ${r.split==='custom'?'imports diferents':'parts iguals'}</div>
+        </div>
+        <div class="mono" style="font-weight:600;font-size:14px;flex-shrink:0">€${fmt(r.amount)}</div>
+      </div>`;
+    }).join('')+`</div>`;
+  }
+
+  // sortir del grup / eliminar
+  if(admin){
+    html+=`<button class="btn btn-danger btn-block" style="margin-top:8px" onclick="deleteGrup()">Eliminar grup</button>`;
+  }
+
+  document.getElementById('detall-body').innerHTML=html;
+}
+
+// ═══════════ SHEETS ═══════════
+function openSheet(type){
+  if(type==='perfil'){
+    document.getElementById('pf-name').value=me.name;
+    document.getElementById('pf-phone').value=me.phone;
+    show('sheet-perfil');
+  }else if(type==='grup'){
+    document.getElementById('sheet-grup-title').textContent='Nou grup';
+    document.getElementById('edit-grup-id').value='';
+    document.getElementById('grup-nom').value='';
+    document.getElementById('grup-color').value='orange';
+    document.getElementById('grup-admin-hint').classList.remove('hidden');
+    show('sheet-grup');
+  }else if(type==='membre'){
+    document.getElementById('mb-name').value='';
+    document.getElementById('mb-phone').value='';
+    setMbFixed(true);
+    show('sheet-membre');
+  }
+}
+function show(id){document.getElementById(id).classList.remove('hidden');}
+function closeSheet(id){document.getElementById(id).classList.add('hidden');}
+function closeSheetIfOverlay(e,id){if(e.target===document.getElementById(id))closeSheet(id);}
+
+// ── perfil ──
+function savePerfil(){
+  const name=document.getElementById('pf-name').value.trim();
+  const phone=document.getElementById('pf-phone').value.trim();
+  if(!name){alert('El nom és obligatori.');return;}
+  if(!validPhone(phone)){alert('El telèfon ha de tenir exactament 9 dígits.');return;}
+  me={name,phone};save();closeSheet('sheet-perfil');render();
+}
+
+// ── grup ──
+function saveGrup(){
+  const nom=document.getElementById('grup-nom').value.trim();
+  if(!nom){alert('El nom del grup és obligatori.');return;}
+  const id=document.getElementById('edit-grup-id').value;
+  const color=document.getElementById('grup-color').value;
+  if(id){
+    const g=groupById(id);if(g){g.name=nom;g.color=color;}
+  }else{
+    groups.push({id:uid(),name:nom,color,adminPhone:me.phone,createdAt:today(),
+      members:[{phone:me.phone,name:me.name,fixed:true}]});
+  }
+  save();closeSheet('sheet-grup');render();
+}
+function deleteGrup(){
+  const g=groupById(currentGroupId);if(!g||!isAdmin(g))return;
+  if(!confirm('Eliminar el grup «'+g.name+'» i totes les seves rondes?'))return;
+  groups=groups.filter(x=>x.id!==g.id);
+  rounds=rounds.filter(r=>r.groupId!==g.id);
+  save();closeSheet('sheet-detall');render();
+}
+
+// ── membre ──
+function setMbFixed(v){mbFixed=v;
+  document.getElementById('mb-fixed-y').classList.toggle('active',v);
+  document.getElementById('mb-fixed-n').classList.toggle('active',!v);
+}
+function saveMembre(){
+  const g=groupById(currentGroupId);if(!g||!isAdmin(g)){alert('Només l\'administrador pot afegir participants.');return;}
+  const name=document.getElementById('mb-name').value.trim();
+  const phone=document.getElementById('mb-phone').value.trim();
+  if(!name){alert('El nom és obligatori.');return;}
+  if(!validPhone(phone)){alert('El telèfon ha de tenir exactament 9 dígits.');return;}
+  if(memberByPhone(g,phone)){alert('Ja hi ha un participant amb aquest telèfon.');return;}
+  g.members.push({phone,name,fixed:mbFixed});
+  save();closeSheet('sheet-membre');renderDetall();
+}
+function removeMembre(phone){
+  const g=groupById(currentGroupId);if(!g||!isAdmin(g))return;
+  if(phone===g.adminPhone){alert('No pots treure l\'administrador.');return;}
+  const m=memberByPhone(g,phone);
+  if(!confirm('Treure «'+(m?m.name:phone)+'» del grup? Les seves rondes anotades es mantindran.'))return;
+  g.members=g.members.filter(x=>x.phone!==phone);
+  save();renderDetall();
+}
+
+// ── ronda ──
+function openRonda(rid){
+  const g=groupById(currentGroupId);if(!g)return;
+  document.getElementById('ronda-title').textContent=rid?'Editar ronda':'Nova ronda';
+  document.getElementById('edit-ronda-id').value=rid||'';
+  document.getElementById('rn-del').classList.toggle('hidden',!rid);
+  // payer options
+  document.getElementById('rn-payer').innerHTML=g.members.map(m=>`<option value="${esc(m.phone)}">${esc(m.name)}</option>`).join('');
+
+  let r=null;
+  if(rid)r=rounds.find(x=>x.id===rid);
+  if(r){
+    document.getElementById('rn-data').value=r.date;
+    document.getElementById('rn-import').value=r.amount;
+    document.getElementById('rn-desc').value=r.desc||'';
+    document.getElementById('rn-payer').value=r.payer;
+    setSplit(r.split);
+    renderParticipants(g,r.participants,r.custom||{});
+  }else{
+    document.getElementById('rn-data').value=today();
+    document.getElementById('rn-import').value='';
+    document.getElementById('rn-desc').value='';
+    document.getElementById('rn-payer').value=me.phone;
+    setSplit('equal');
+    // fixos preseleccionats
+    const preselect=g.members.filter(m=>m.fixed).map(m=>m.phone);
+    renderParticipants(g,preselect,{});
+  }
+  show('sheet-ronda');
+}
+function setSplit(mode){rnSplit=mode;
+  document.getElementById('rn-split-eq').classList.toggle('active',mode==='equal');
+  document.getElementById('rn-split-cu').classList.toggle('active',mode==='custom');
+  document.querySelectorAll('.pp-amt').forEach(i=>i.style.display=mode==='custom'?'block':'none');
+  updateShares();
+}
+function renderParticipants(g,selected,custom){
+  const members=[...g.members].sort((a,b)=>(b.fixed?1:0)-(a.fixed?1:0)||a.name.localeCompare(b.name));
+  document.getElementById('rn-participants').innerHTML=members.map(m=>{
+    const on=selected.includes(m.phone);
+    return `<div class="pp-item ${on?'on':''}" data-phone="${esc(m.phone)}" onclick="toggleParticipant(this)">
+      <div class="pp-check">${on?'✓':''}</div>
+      <div class="pp-name">${esc(m.name)} <span class="badge ${m.fixed?'b-fixed':'b-event'}" style="margin-left:4px">${m.fixed?'Fix':'Eventual'}</span></div>
+      <input type="number" class="pp-amt" step="0.01" min="0" inputmode="decimal" placeholder="0.00" value="${custom[m.phone]!=null?custom[m.phone]:''}" onclick="event.stopPropagation()" oninput="updateShares()" style="display:${rnSplit==='custom'?'block':'none'}">
+    </div>`;
+  }).join('');
+  updateShares();
+}
+function toggleParticipant(el){
+  el.classList.toggle('on');
+  el.querySelector('.pp-check').textContent=el.classList.contains('on')?'✓':'';
+  updateShares();
+}
+function selectedParticipants(){return [...document.querySelectorAll('.pp-item.on')].map(e=>e.dataset.phone);}
+function updateShares(){
+  const amount=parseFloat(document.getElementById('rn-import').value)||0;
+  const sel=selectedParticipants();
+  const line=document.getElementById('rn-sumline');
+  if(rnSplit==='equal'){
+    const per=sel.length?amount/sel.length:0;
+    line.style.color='var(--color-text-secondary)';
+    line.textContent=sel.length?`${sel.length} participants · €${fmt(per)} cadascú`:'Selecciona qui participa.';
+  }else{
+    let sum=0;
+    document.querySelectorAll('.pp-item.on .pp-amt').forEach(i=>sum+=parseFloat(i.value)||0);
+    const diff=amount-sum;
+    if(Math.abs(diff)<0.01){line.style.color='var(--credit)';line.textContent=`Repartit €${fmt(sum)} de €${fmt(amount)} ✓`;}
+    else{line.style.color='var(--debit)';line.textContent=`Repartit €${fmt(sum)} de €${fmt(amount)} · ${diff>0?'falten':'sobren'} €${fmt(Math.abs(diff))}`;}
+  }
+}
+function saveRonda(){
+  const g=groupById(currentGroupId);if(!g)return;
+  const date=document.getElementById('rn-data').value;
+  const amount=parseFloat(document.getElementById('rn-import').value);
+  const payer=document.getElementById('rn-payer').value;
+  const desc=document.getElementById('rn-desc').value.trim();
+  const parts=selectedParticipants();
+  if(!date){alert('Posa la data.');return;}
+  if(isNaN(amount)||amount<=0){alert('L\'import ha de ser més gran que 0.');return;}
+  if(!parts.length){alert('Selecciona almenys un participant.');return;}
+  let custom=null;
+  if(rnSplit==='custom'){
+    custom={};let sum=0;
+    document.querySelectorAll('.pp-item.on').forEach(el=>{
+      const v=parseFloat(el.querySelector('.pp-amt').value)||0;
+      custom[el.dataset.phone]=v;sum+=v;
+    });
+    if(Math.abs(sum-amount)>0.01){alert('La suma dels imports (€'+fmt(sum)+') ha de coincidir amb el total (€'+fmt(amount)+').');return;}
+  }
+  const id=document.getElementById('edit-ronda-id').value;
+  const obj={id:id||uid(),groupId:g.id,date,desc,payer,amount,participants:parts,split:rnSplit,custom};
+  if(id){const i=rounds.findIndex(r=>r.id===id);if(i>=0)rounds[i]=obj;}
+  else rounds.push(obj);
+  save();closeSheet('sheet-ronda');renderDetall();
+}
+function deleteRonda(){
+  const id=document.getElementById('edit-ronda-id').value;
+  if(!id||!confirm('Eliminar aquesta ronda?'))return;
+  rounds=rounds.filter(r=>r.id!==id);
+  save();closeSheet('sheet-ronda');renderDetall();
+}
+
+// ═══════════ ONBOARDING ═══════════
+function saveOnboarding(){
+  const name=document.getElementById('ob-name').value.trim();
+  const phone=document.getElementById('ob-phone').value.trim();
+  if(!name){alert('Escriu el teu nom.');return;}
+  if(!validPhone(phone)){alert('El telèfon ha de tenir exactament 9 dígits.');return;}
+  me={name,phone};save();
+  document.getElementById('onboarding').classList.add('hidden');
+  showPage('grups');
+}
+function resetAll(){
+  if(!confirm('Segur? S\'esborraran perfil, grups i rondes d\'aquest dispositiu.'))return;
+  localStorage.removeItem('toc_me');localStorage.removeItem('toc_groups');localStorage.removeItem('toc_rounds');
+  location.reload();
+}
+
+// només dígits als inputs de telèfon
+document.addEventListener('input',e=>{
+  if(e.target.matches('input[type="tel"]'))e.target.value=e.target.value.replace(/\D/g,'').slice(0,9);
+});
+
+// ═══════════ PWA ═══════════
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;document.getElementById('install-banner').classList.add('show');});
+function installApp(){if(!deferredInstall)return;deferredInstall.prompt();deferredInstall.userChoice.then(()=>{deferredInstall=null;hideBanner();});}
+function hideBanner(){document.getElementById('install-banner').classList.remove('show');}
+window.addEventListener('appinstalled',()=>hideBanner());
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});}
+
+// ═══════════ INIT ═══════════
+(function init(){
+  load();
+  if(!me){document.getElementById('onboarding').classList.remove('hidden');}
+  else{showPage('grups');}
+})();
+</script>
+</body>
+</html>
