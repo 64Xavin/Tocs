@@ -1,4 +1,4 @@
-const CACHE_NAME = 'el-toc-v1';
+const CACHE_NAME = 'el-toc-v2';
 const ASSETS = [
   '/index.html',
   '/manifest.json',
@@ -25,6 +25,18 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
+  const isDoc = event.request.mode === 'navigate' || event.request.destination === 'document';
+  if (isDoc) {
+    // xarxa primer perquè les actualitzacions de l'app arribin; cau a la cache si no hi ha connexió
+    event.respondWith(
+      fetch(event.request).then(response => {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put('/index.html', clone));
+        return response;
+      }).catch(() => caches.match('/index.html'))
+    );
+    return;
+  }
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
@@ -33,11 +45,7 @@ self.addEventListener('fetch', event => {
         const clone = response.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         return response;
-      }).catch(() => {
-        if (event.request.destination === 'document') {
-          return caches.match('/index.html');
-        }
-      });
+      }).catch(() => {});
     })
   );
 });

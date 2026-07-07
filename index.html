@@ -226,6 +226,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 <!-- TOP BAR -->
 <div class="topbar">
   <span class="topbar-title" id="topbar-title">Els meus grups</span>
+  <span id="sync-dot" style="font-size:15px"></span>
   <button class="topbar-btn hidden" id="topbar-action" onclick="handleTopbarAction()">+ Grup</button>
 </div>
 
@@ -264,7 +265,8 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
     <div class="card">
       <div class="sh-title" style="margin-bottom:8px">Sobre El Toc</div>
-      <p style="font-size:13px;color:var(--color-text-secondary);line-height:1.6">Les dades es desen només en aquest dispositiu. Comparteix el teu telèfon amb qui creï un grup perquè t'hi afegeixi. La sincronització entre mòbils diferents arribarà en una propera versió amb servidor.</p>
+      <p id="sync-status" style="font-size:13px;color:var(--color-text-secondary);line-height:1.6;margin-bottom:6px">Dades només en aquest dispositiu (núvol no configurat).</p>
+      <p style="font-size:13px;color:var(--color-text-secondary);line-height:1.6">Comparteix el teu telèfon (9 dígits) amb qui creï un grup perquè t'hi afegeixi.</p>
       <button class="btn btn-danger btn-block" style="margin-top:12px" onclick="resetAll()">Esborrar totes les dades</button>
     </div>
   </div>
@@ -668,7 +670,8 @@ function savePerfil(){
   const phone=document.getElementById('pf-phone').value.trim();
   if(!name){alert('El nom és obligatori.');return;}
   if(!validPhone(phone)){alert('El telèfon ha de tenir exactament 9 dígits.');return;}
-  me={name,phone};save();closeSheet('sheet-perfil');render();
+  me={name,phone};save();window.tocSync?.restart(phone);
+  closeSheet('sheet-perfil');render();
 }
 
 // ── grup ──
@@ -677,20 +680,25 @@ function saveGrup(){
   if(!nom){alert('El nom del grup és obligatori.');return;}
   const id=document.getElementById('edit-grup-id').value;
   const color=document.getElementById('grup-color').value;
+  let g;
   if(id){
-    const g=groupById(id);if(g){g.name=nom;g.color=color;}
+    g=groupById(id);if(g){g.name=nom;g.color=color;}
   }else{
-    groups.push({id:uid(),name:nom,color,adminPhone:me.phone,createdAt:today(),
-      members:[{phone:me.phone,name:me.name,fixed:true}]});
+    g={id:uid(),name:nom,color,adminPhone:me.phone,createdAt:today(),
+      members:[{phone:me.phone,name:me.name,fixed:true}]};
+    groups.push(g);
   }
-  save();closeSheet('sheet-grup');render();
+  save();if(g)window.tocSync?.pushGroup(g);
+  closeSheet('sheet-grup');render();
 }
 function deleteGrup(){
   const g=groupById(currentGroupId);if(!g||!isAdmin(g))return;
   if(!confirm('Eliminar el grup «'+g.name+'» i totes les seves rondes?'))return;
+  const rids=rounds.filter(r=>r.groupId===g.id).map(r=>r.id);
   groups=groups.filter(x=>x.id!==g.id);
   rounds=rounds.filter(r=>r.groupId!==g.id);
-  save();closeSheet('sheet-detall');render();
+  save();window.tocSync?.deleteGroup(g.id,rids);
+  closeSheet('sheet-detall');render();
 }
 
 // ── membre ──
@@ -706,7 +714,8 @@ function saveMembre(){
   if(!validPhone(phone)){alert('El telèfon ha de tenir exactament 9 dígits.');return;}
   if(memberByPhone(g,phone)){alert('Ja hi ha un participant amb aquest telèfon.');return;}
   g.members.push({phone,name,fixed:mbFixed});
-  save();closeSheet('sheet-membre');renderDetall();
+  save();window.tocSync?.pushGroup(g);
+  closeSheet('sheet-membre');renderDetall();
 }
 function removeMembre(phone){
   const g=groupById(currentGroupId);if(!g||!isAdmin(g))return;
@@ -714,7 +723,8 @@ function removeMembre(phone){
   const m=memberByPhone(g,phone);
   if(!confirm('Treure «'+(m?m.name:phone)+'» del grup? Les seves rondes anotades es mantindran.'))return;
   g.members=g.members.filter(x=>x.phone!==phone);
-  save();renderDetall();
+  save();window.tocSync?.pushGroup(g);
+  renderDetall();
 }
 
 // ── ronda ──
@@ -810,13 +820,16 @@ function saveRonda(){
   const obj={id:id||uid(),groupId:g.id,date,desc,payer,amount,participants:parts,split:rnSplit,custom};
   if(id){const i=rounds.findIndex(r=>r.id===id);if(i>=0)rounds[i]=obj;}
   else rounds.push(obj);
-  save();closeSheet('sheet-ronda');renderDetall();
+  save();window.tocSync?.pushRound(obj);
+  closeSheet('sheet-ronda');renderDetall();
 }
 function deleteRonda(){
   const id=document.getElementById('edit-ronda-id').value;
   if(!id||!confirm('Eliminar aquesta ronda?'))return;
-  rounds=rounds.filter(r=>r.id!==id);
-  save();closeSheet('sheet-ronda');renderDetall();
+  const r=rounds.find(x=>x.id===id);
+  rounds=rounds.filter(x=>x.id!==id);
+  save();if(r)window.tocSync?.deleteRound(r.groupId,id);
+  closeSheet('sheet-ronda');renderDetall();
 }
 
 // ═══════════ ONBOARDING ═══════════
@@ -825,7 +838,7 @@ function saveOnboarding(){
   const phone=document.getElementById('ob-phone').value.trim();
   if(!name){alert('Escriu el teu nom.');return;}
   if(!validPhone(phone)){alert('El telèfon ha de tenir exactament 9 dígits.');return;}
-  me={name,phone};save();
+  me={name,phone};save();window.tocSync?.start(phone);
   document.getElementById('onboarding').classList.add('hidden');
   showPage('grups');
 }
@@ -853,6 +866,124 @@ if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.s
   if(!me){document.getElementById('onboarding').classList.remove('hidden');}
   else{showPage('grups');}
 })();
+</script>
+
+<script type="module">
+// ═══════════ SINCRONITZACIÓ AL NÚVOL (Firebase Firestore) ═══════════
+// Per activar-la:
+//  1. Crea un projecte a https://console.firebase.google.com
+//  2. Activa Firestore Database i l'autenticació anònima (Authentication → Anonymous)
+//  3. Substitueix el "null" de sota per l'objecte firebaseConfig del teu projecte
+const FIREBASE_CONFIG = null;
+/* Exemple:
+const FIREBASE_CONFIG = {
+  apiKey: "AIza....",
+  authDomain: "el-toc.firebaseapp.com",
+  projectId: "el-toc",
+  storageBucket: "el-toc.appspot.com",
+  messagingSenderId: "1234567890",
+  appId: "1:1234567890:web:abc123"
+};
+*/
+
+const syncDot=document.getElementById('sync-dot');
+const syncStatus=document.getElementById('sync-status');
+function setSyncStatus(txt,icon){if(syncDot)syncDot.textContent=icon;if(syncStatus)syncStatus.textContent=txt;}
+
+if(!FIREBASE_CONFIG){
+  setSyncStatus('Dades només en aquest dispositiu (núvol no configurat).','');
+}else{
+  try{
+    const {initializeApp}=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
+    const {getAuth,signInAnonymously}=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
+    const {getFirestore,collection,doc,setDoc,deleteDoc,onSnapshot,query,where}=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+    const fbApp=initializeApp(FIREBASE_CONFIG);
+    const db=getFirestore(fbApp);
+    await signInAnonymously(getAuth(fbApp));
+
+    let unsubGroups=null;
+    const roundSubs={};
+    const detailOpen=()=>!document.getElementById('sheet-detall').classList.contains('hidden');
+
+    function stopAll(){
+      if(unsubGroups){unsubGroups();unsubGroups=null;}
+      Object.keys(roundSubs).forEach(k=>{roundSubs[k]();delete roundSubs[k];});
+    }
+    function listenRounds(gid){
+      if(roundSubs[gid])return;
+      roundSubs[gid]=onSnapshot(collection(db,'groups',gid,'rounds'),snap=>{
+        snap.docChanges().forEach(ch=>{
+          const id=ch.doc.id;
+          if(ch.type==='removed'){rounds=rounds.filter(r=>r.id!==id);}
+          else{
+            const data={id,groupId:gid,...ch.doc.data()};
+            const i=rounds.findIndex(r=>r.id===id);
+            if(i>=0)rounds[i]=data;else rounds.push(data);
+          }
+        });
+        save();render();
+        if(currentGroupId===gid&&detailOpen())renderDetall();
+      },err=>console.error('sync rondes',err));
+    }
+    function pushGroup(g){
+      const d={...g,memberPhones:g.members.map(m=>m.phone),updatedAt:Date.now()};
+      delete d.id;
+      setDoc(doc(db,'groups',g.id),d).catch(e=>console.error('push grup',e));
+      listenRounds(g.id);
+    }
+    function pushRound(r){
+      const d={...r,updatedAt:Date.now()};
+      delete d.id;delete d.groupId;
+      setDoc(doc(db,'groups',r.groupId,'rounds',r.id),d).catch(e=>console.error('push ronda',e));
+    }
+    function start(phone){
+      stopAll();
+      // migra al núvol els grups locals on sóc admin (idempotent, mateixos ids)
+      groups.filter(g=>g.adminPhone===phone).forEach(g=>{
+        pushGroup(g);
+        rounds.filter(r=>r.groupId===g.id).forEach(pushRound);
+      });
+      unsubGroups=onSnapshot(query(collection(db,'groups'),where('memberPhones','array-contains',phone)),snap=>{
+        snap.docChanges().forEach(ch=>{
+          const id=ch.doc.id;
+          if(ch.type==='removed'){
+            groups=groups.filter(g=>g.id!==id);
+            rounds=rounds.filter(r=>r.groupId!==id);
+            if(roundSubs[id]){roundSubs[id]();delete roundSubs[id];}
+          }else{
+            const data={id,...ch.doc.data()};
+            delete data.memberPhones;delete data.updatedAt;
+            const i=groups.findIndex(g=>g.id===id);
+            if(i>=0)groups[i]=data;else groups.push(data);
+            listenRounds(id);
+          }
+        });
+        save();render();
+        if(detailOpen())renderDetall();
+      },err=>{console.error('sync grups',err);setSyncStatus('Error de sincronització ('+(err.code||err.message)+').','⚠️');});
+      setSyncStatus('Sincronització al núvol activada: els grups es comparteixen entre dispositius.','☁️');
+    }
+
+    window.tocSync={
+      enabled:true,
+      start,
+      restart:start,
+      pushGroup,
+      pushRound,
+      deleteGroup(id,roundIds){
+        (roundIds||[]).forEach(rid=>deleteDoc(doc(db,'groups',id,'rounds',rid)).catch(()=>{}));
+        deleteDoc(doc(db,'groups',id)).catch(e=>console.error('esborra grup',e));
+        if(roundSubs[id]){roundSubs[id]();delete roundSubs[id];}
+      },
+      deleteRound(gid,id){deleteDoc(doc(db,'groups',gid,'rounds',id)).catch(e=>console.error('esborra ronda',e));}
+    };
+
+    if(me)start(me.phone);
+  }catch(e){
+    console.error('Firebase init',e);
+    setSyncStatus('No s\'ha pogut connectar al núvol: '+e.message,'⚠️');
+  }
+}
 </script>
 </body>
 </html>
