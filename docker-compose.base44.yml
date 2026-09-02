@@ -1,0 +1,20 @@
+services:
+  web:
+    image: node:22
+    working_dir: /app
+    init: true
+    command:
+      - sh
+      - -c
+      - >-
+        npx --yes browser-sync@3.0.4 start
+        --server /app
+        --files '/app/*.html,/app/*.js,/app/*.json,/app/*.png'
+        --host 0.0.0.0
+        --port 3000
+        --no-open
+        --no-ui
+    volumes:
+      - .:/app
+    ports:
+      - "3000:3000"

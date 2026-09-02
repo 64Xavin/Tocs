@@ -870,38 +870,9 @@ if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.s
 
 <script type="module">
 // ═══════════ SINCRONITZACIÓ AL NÚVOL (Firebase Firestore) ═══════════
-// Per activar-la:
-//  1. Crea un projecte a https://console.firebase.google.com
-//  2. Activa Firestore Database i l'autenticació anònima (Authentication → Anonymous)
-//  3. Substitueix el "null" de sota per l'objecte firebaseConfig del teu projecte
-//const FIREBASE_CONFIG = null;
-  // Import the functions you need from the SDKs you need
-//import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyBxOYFRfSvIwqOf-DMFNZnd251K6st-qyE",
-  authDomain: "eltoc-11401.firebaseapp.com",
-  projectId: "eltoc-11401",
-  storageBucket: "eltoc-11401.firebasestorage.app",
-  messagingSenderId: "154689886102",
-  appId: "1:154689886102:web:1fec83e0626f5a330b6fb7"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-/* Exemple:
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyBxOYFRfSvIwqOf-DMFNZnd251K6st-qyE",
-  authDomain: "eltoc-11401.firebaseapp.com",
-  projectId: "eltoc-11401",
-  storageBucket: "eltoc-11401.firebasestorage.app",
-  messagingSenderId: "154689886102",
-  appId: "1:154689886102:web:1fec83e0626f5a330b6fb7"
-};
-*/
+// Cloud sync is optional. Keep this null for local-only storage.
+// To enable it, provide a Firebase web config and enable Firestore plus anonymous auth.
+const FIREBASE_CONFIG = null;
 
 const syncDot=document.getElementById('sync-dot');
 const syncStatus=document.getElementById('sync-status');
